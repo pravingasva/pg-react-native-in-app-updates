@@ -187,12 +187,11 @@ export default class InAppUpdates extends InAppUpdatesBase {
       );
     }
 
-    return SpInAppUpdates.startUpdate(
-      updateType,
-      allowAssetPackDeletion
-    ).catch((err: any) => {
-      this.throwError(err, 'startUpdate');
-    });
+    return SpInAppUpdates.startUpdate(updateType, allowAssetPackDeletion).catch(
+      (err: any) => {
+        this.throwError(err, 'startUpdate');
+      }
+    );
   };
 
   public async getUpdatePriority(): Promise<number> {
