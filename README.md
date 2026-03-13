@@ -1,8 +1,6 @@
-# sp-react-native-in-app-updates
+# pg-react-native-in-app-updates
 
 ## Getting started
-
-<br>
 
 ### What is this?
 
@@ -13,14 +11,9 @@ It uses **embedded** [in-app-updates via Play-Core](https://developer.android.co
 ### Why?
 Because to this day I'm not aware of any react-native libraries that use play core to offer embedded in-app-updates besides this one
 
-
-<br>
-
 ## Installation
 
-`$ npm install sp-react-native-in-app-updates --save`
-
-<br>
+`npm install github:pravingasva/pg-react-native-in-app-updates#<version-tag>`
 
 ##### iOS only:
 
@@ -42,8 +35,6 @@ For **Expo Apps** Add the following to your expo `app.json` or `app.config.json`
     },
 ```
 Next, rebuild the native files using ```npx expo prebuild --clean && eas build -p ios```
-
-<br>
 
 ##### Note:
 
@@ -92,14 +83,12 @@ plugins: [
 
 ## Usage
 
-
-
 ```ts
 import InAppUpdates, {
   IAUUpdateKind,
   IAU_UPDATE_TYPE_AUTO,
   updateKindFromPriority,
-} from 'sp-react-native-in-app-updates';
+} from 'pg-react-native-in-app-updates';
 
 const inAppUpdates = new InAppUpdates(false);
 
@@ -144,8 +133,6 @@ inAppUpdates
   });
 ```
 
----
-
 ## API reference
 
 ### `checkNeedsUpdate(checkOptions?: CheckOptions): Promise<NeedsUpdateResponse>`
@@ -161,7 +148,6 @@ Starts the update flow (Play Core in-app update on Android, App Store prompt on 
 - `updateType?: IAUUpdateKind | typeof IAU_UPDATE_TYPE_AUTO` — if not provided, the library uses play priority to choose `IMMEDIATE` or `FLEXIBLE`.
 - `allowAssetPackDeletion?: boolean` — allow Play Core to delete old asset packs during the update.
 
----
 
 ## API options reference
 
@@ -187,9 +173,6 @@ Starts the update flow (Play Core in-app update on Android, App Store prompt on 
 | `country` | `string` | (iOS only) Country code for App Store lookup. |
 | `versionSpecificOptions` | `Array<IosStartUpdateOptionWithLocalVersion>` | (iOS only) Version-specific rules for prompting. |
 
----
-
-## Typical debugging workflow we had success with:
 
 ## Typical debugging workflow we had success with:
 
@@ -221,11 +204,8 @@ That means google play knows there's an available update
 
 Haven't really found any easier ways to test that everything works, but hey.. it get's the job done
 
-<br>
-
 ## Troubleshooting
 Keep in mind that this library is JUST a **WRAPPER** of the in-app-update api, so if you have trouble making in-app-updates work it's most probably because you're doing something wrong with google play.
-<br>
 
 - In-app updates works only with devices running Android 5.0 (**API level 21**) or higher.
 - Testing this won’t work on a debug build. You would need a release build signed with the same key you use to sign your app before uploading to the Play Store (dummy signing can be used). It would be a good time to use the internal testing track.
@@ -237,17 +217,9 @@ Open the Google Play Store app and go to the My Apps & Games tab.
 
 **Important: If the app you are testing doesn’t appear with an available update, don't bother checking for updates programmatically, because you'll probably never see any available updates via code either.**
 
-<br>
-
 ## Contributing:
 
 This library is offered as is, if you'd like to change something please open a PR
-
-<br>
-
-## Changelog
-
-Read the [CHANGELOG.md](https://github.com/SudoPlz/sp-react-native-in-app-updates/blob/master/CHANGELOG.md) file
 
 ## License
 MIT
