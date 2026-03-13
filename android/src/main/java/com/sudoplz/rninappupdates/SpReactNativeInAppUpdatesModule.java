@@ -22,6 +22,7 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.google.android.play.core.appupdate.AppUpdateInfo;
 import com.google.android.play.core.appupdate.AppUpdateManager;
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
+import com.google.android.play.core.appupdate.AppUpdateOptions;
 import com.google.android.play.core.install.InstallState;
 import com.google.android.play.core.install.InstallStateUpdatedListener;
 import com.google.android.play.core.install.model.AppUpdateType;
@@ -105,9 +106,10 @@ public class SpReactNativeInAppUpdatesModule extends ReactContextBaseJavaModule 
             map.putBoolean("isFlexibleUpdateAllowed", appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE));
             map.putInt("updatePriority", appUpdateInfo.updatePriority());
             Integer clientVersionStaleness = appUpdateInfo.clientVersionStalenessDays();
-            if (clientVersionStaleness != null) {
-                map.putInt("dayStaleness", clientVersionStaleness.intValue());
-            }
+            map.putInt(
+                "clientVersionStalenessDays",
+                (clientVersionStaleness != null ? clientVersionStaleness.intValue() : -1)
+            );
 
             map.putInt("versionCode", appUpdateInfo.availableVersionCode());
             String packageName = appUpdateInfo.packageName();
@@ -122,8 +124,25 @@ public class SpReactNativeInAppUpdatesModule extends ReactContextBaseJavaModule 
         });
     }
 
+    private static final int UPDATE_TYPE_AUTO = -1;
+
+    private int resolveUpdateType(AppUpdateInfo appUpdateInfo, int requestedType) {
+        if (requestedType != UPDATE_TYPE_AUTO) {
+            return requestedType;
+        }
+
+        int priority = appUpdateInfo.updatePriority();
+        if (priority >= 4) {
+            return AppUpdateType.IMMEDIATE;
+        }
+        if (priority >= 2) {
+            return AppUpdateType.FLEXIBLE;
+        }
+        return AppUpdateType.FLEXIBLE;
+    }
+
     @ReactMethod
-    public void startUpdate(int updateType, Promise resolutionPromise) {
+    public void startUpdate(int updateType, boolean allowAssetPackDeletion, Promise resolutionPromise) {
         // Returns an intent object that you use to check for an update.
         Task<AppUpdateInfo> appUpdateInfoTask = appUpdateManager.getAppUpdateInfo();
 
@@ -135,24 +154,40 @@ public class SpReactNativeInAppUpdatesModule extends ReactContextBaseJavaModule 
         appUpdateInfoTask.addOnSuccessListener(appUpdateInfo -> {
             if (appUpdateInfo.updateAvailability() != UpdateAvailability.UPDATE_AVAILABLE) {
                 resolutionPromise.reject("Error", "Update unavailable, check checkNeedsUpdate.updateAvailability first");
-            } else if (!appUpdateInfo.isUpdateTypeAllowed(updateType)) {
-                resolutionPromise.reject("Error", "Update type unavailable, check checkNeedsUpdate.isImmediateUpdateAllowed or checkNeedsUpdate.isFlexibleUpdateAllowed first.");
-            } else {
-                try {
-                    appUpdateManager.startUpdateFlowForResult(
-                        // Pass the intent that is returned by 'getAppUpdateInfo()'.
-                        appUpdateInfo,
-                        // 'AppUpdateType.IMMEDIATE' Or 'AppUpdateType.FLEXIBLE'
-                        updateType,
-                        // The current activity making the update request.
-                        getCurrentActivity(),
-                        // Include a request code to later monitor this update request.
-                        IN_APP_UPDATE_REQUEST_CODE
-                    );
-                    resolutionPromise.resolve("Done");
-                } catch (IntentSender.SendIntentException e) {
-                    resolutionPromise.reject("SendIntentException","Error while starting the update flow: "+e.toString());
+                return;
+            }
+
+            int resolvedUpdateType = resolveUpdateType(appUpdateInfo, updateType);
+            if (!appUpdateInfo.isUpdateTypeAllowed(resolvedUpdateType)) {
+                // If auto-resolve chose a type not allowed, try the other type as a fallback.
+                if (resolvedUpdateType == AppUpdateType.IMMEDIATE && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
+                    resolvedUpdateType = AppUpdateType.FLEXIBLE;
+                } else if (resolvedUpdateType == AppUpdateType.FLEXIBLE && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
+                    resolvedUpdateType = AppUpdateType.IMMEDIATE;
+                } else {
+                    resolutionPromise.reject("Error", "Update type unavailable, check checkNeedsUpdate.isImmediateUpdateAllowed or checkNeedsUpdate.isFlexibleUpdateAllowed first.");
+                    return;
                 }
+            }
+
+            try {
+                AppUpdateOptions options = AppUpdateOptions.newBuilder(resolvedUpdateType)
+                    .setAllowAssetPackDeletion(allowAssetPackDeletion)
+                    .build();
+
+                appUpdateManager.startUpdateFlowForResult(
+                    // Pass the intent that is returned by 'getAppUpdateInfo()'.
+                    appUpdateInfo,
+                    // The current activity making the update request.
+                    getCurrentActivity(),
+                    // Provide options so we can control immediate/flexible and asset pack deletion.
+                    options,
+                    // Include a request code to later monitor this update request.
+                    IN_APP_UPDATE_REQUEST_CODE
+                );
+                resolutionPromise.resolve("Done");
+            } catch (IntentSender.SendIntentException e) {
+                resolutionPromise.reject("SendIntentException","Error while starting the update flow: "+e.toString());
             }
         });
     }

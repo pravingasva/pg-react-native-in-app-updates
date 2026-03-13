@@ -1,5 +1,6 @@
 import semver from 'semver';
 import type { SemverVersion } from './types';
+import { AndroidUpdateType } from './types';
 
 export const compareVersions = (
   versionToCheck: SemverVersion,
@@ -23,3 +24,15 @@ export const compareVersions = (
   }
   return 0;
 };
+
+export function updateKindFromPriority(
+  priority: number,
+  stalenessDays?: number
+): AndroidUpdateType {
+  if (priority >= 4) return AndroidUpdateType.IMMEDIATE;
+  if (priority >= 2) return AndroidUpdateType.FLEXIBLE;
+  // Optional: staleness fallback — if low priority but very stale, force flexible
+  if (stalenessDays !== undefined && stalenessDays >= 14)
+    return AndroidUpdateType.FLEXIBLE;
+  return AndroidUpdateType.FLEXIBLE;
+}

@@ -80,6 +80,17 @@ export enum AndroidUpdateType {
   IMMEDIATE = 1,
 }
 
+export const IAU_UPDATE_TYPE_AUTO = -1;
+
+export enum IAUUpdatePriority {
+  NONE = 0,
+  LOW_1 = 1,
+  LOW = 2,
+  MEDIUM = 3,
+  HIGH = 4,
+  CRITICAL = 5,
+}
+
 export type AndroidInAppUpdateExtras = {
   updateAvailability: AndroidAvailabilityStatus;
   versionCode: SemverVersionCode;
@@ -88,6 +99,7 @@ export type AndroidInAppUpdateExtras = {
   packageName: string;
   totalBytes: number;
   updatePriority: number;
+  clientVersionStalenessDays: number;
 };
 
 export interface AndroidNeedsUpdateResponse extends NeedsUpdateResponseBase {
@@ -101,7 +113,8 @@ export type AndroidIntentResultListener = (
 ) => void;
 
 export type AndroidStartUpdateOptions = {
-  updateType: AndroidUpdateType;
+  updateType?: AndroidUpdateType | typeof IAU_UPDATE_TYPE_AUTO;
+  allowAssetPackDeletion?: boolean;
 };
 
 export type IosITunesResponse = {

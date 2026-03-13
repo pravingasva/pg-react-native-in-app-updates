@@ -3,6 +3,8 @@ export {
   AndroidAvailabilityStatus as IAUAvailabilityStatus,
   AndroidInstallStatus as IAUInstallStatus,
   AndroidOther as IAUOther,
+  IAU_UPDATE_TYPE_AUTO,
+  IAUUpdatePriority,
 } from './types';
 
 // @ts-expect-error

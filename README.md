@@ -1,7 +1,5 @@
 # sp-react-native-in-app-updates
 
-![In app update example](https://user-images.githubusercontent.com/8539174/88419625-6db0ef00-cddd-11ea-814e-389db852368b.gif)
-
 ## Getting started
 
 <br>
@@ -51,6 +49,12 @@ Next, rebuild the native files using ```npx expo prebuild --clean && eas build -
 
 This project uses [`react-native-device-info`](https://github.com/react-native-device-info/react-native-device-info#installation) in the background. Install it to ensure everything works correctly.
 
+### Requirements
+
+- **React Native:** 0.60+ (autolinking required)
+- **Android:** minSdkVersion 21 (Lollipop) and AndroidX
+- **Google Play:** must install from Play (internal sharing or testing track) for in-app updates to work
+
 ### Expo:
 
 In order to make it work using **Expo** you need to replace react-native-device-info dependency.
@@ -90,134 +94,102 @@ plugins: [
 
 
 
-```javascript
-import SpInAppUpdates, {
-  NeedsUpdateResponse,
+```ts
+import InAppUpdates, {
   IAUUpdateKind,
-  StartUpdateOptions,
+  IAU_UPDATE_TYPE_AUTO,
+  updateKindFromPriority,
 } from 'sp-react-native-in-app-updates';
 
-const inAppUpdates = new SpInAppUpdates(
-  false // isDebug
+const inAppUpdates = new InAppUpdates(false);
+
+const result = await inAppUpdates.checkNeedsUpdate();
+if (!result.shouldUpdate) return;
+
+// Android: result.other contains Play Core fields like updatePriority
+const androidInfo = (result as any).other;
+
+// Option A: let the library auto-select the mode based on Play priority
+await inAppUpdates.startUpdate({});
+
+// Option B: decide in JS (using the helper)
+const updateType = updateKindFromPriority(
+  androidInfo.updatePriority,
+  androidInfo.clientVersionStalenessDays
 );
-// curVersion is optional if you don't provide it will automatically take from the app using react-native-device-info
-inAppUpdates.checkNeedsUpdate({ curVersion: '0.0.8' }).then((result) => {
-  if (result.shouldUpdate) {
-    let updateOptions: StartUpdateOptions = {};
-    if (Platform.OS === 'android') {
-      // android only, on iOS the user will be promped to go to your app store page
-      updateOptions = {
-        updateType: IAUUpdateKind.FLEXIBLE,
-      };
-    }
-    inAppUpdates.startUpdate(updateOptions); // https://github.com/SudoPlz/sp-react-native-in-app-updates/blob/master/src/types.ts#L78
-  }
+await inAppUpdates.startUpdate({ updateType });
+
+// Option C: force a specific mode
+await inAppUpdates.startUpdate({ updateType: IAUUpdateKind.IMMEDIATE });
+
+// Optional: allow Play Core to delete old asset packs during update
+await inAppUpdates.startUpdate({
+  updateType: IAU_UPDATE_TYPE_AUTO,
+  allowAssetPackDeletion: true,
 });
 ```
-### Usage with app updates for specific country (iOS only)
-```javascript
-//                              👇🏻 (optional)
-inAppUpdates.checkNeedsUpdate({ country: 'it' }).then(result => {
-  if (result.shouldUpdate) {
-    const updateOptions: StartUpdateOptions = Platform.select({
-      ios: {
-        title: 'Update available',
-        message: "There is a new version of the app available on the App Store, do you want to update it?",
-        buttonUpgradeText: 'Update',
-        buttonCancelText: 'Cancel',
-        country: 'it', // 👈🏻 the country code for the specific version to lookup for (optional)
-      },
-      android: {
-        updateType: IAUUpdateKind.IMMEDIATE,
-      },
+### Optional: country-specific App Store checks (iOS only)
+
+```js
+inAppUpdates
+  .checkNeedsUpdate({ country: 'it' })
+  .then((result) => {
+    if (!result.shouldUpdate) return;
+
+    inAppUpdates.startUpdate({
+      title: 'Update available',
+      message: 'There is a new version available in the App Store.',
+      country: 'it',
     });
-    inAppUpdates.startUpdate(updateOptions);
-  }
-});
+  });
 ```
-<br>
-<br>
 
-### Methods:
-<br>
+---
 
-#### `checkNeedsUpdate(checkOptions: CheckOptions) : Promise<NeedsUpdateResponse>`
+## API reference
 
-Checks if there are any updates available.
+### `checkNeedsUpdate(checkOptions?: CheckOptions): Promise<NeedsUpdateResponse>`
 
-Where:
-`CheckOptions`
+Checks the store for a newer version.
 
-| Options | Type  | Description  |
+### `startUpdate(updateOptions?: StartUpdateOptions): Promise<void>`
+
+Starts the update flow (Play Core in-app update on Android, App Store prompt on iOS).
+
+#### Android-specific `StartUpdateOptions`
+
+- `updateType?: IAUUpdateKind | typeof IAU_UPDATE_TYPE_AUTO` — if not provided, the library uses play priority to choose `IMMEDIATE` or `FLEXIBLE`.
+- `allowAssetPackDeletion?: boolean` — allow Play Core to delete old asset packs during the update.
+
+---
+
+## API options reference
+
+### `checkNeedsUpdate(checkOptions?: CheckOptions)`
+
+| Option | Type | Description |
 |---|---|---|
-| curVersion  | (required) String | The semver of your current app version  |
-|  toSemverConverter | (optional) Function  |  This will run right after the store version is fetched in case you want to change it before it's compared as a semver |
-|  customVersionComparator | (optional) Function  | By default this library uses `semver` behind the scenes to compare the store version with the `curVersion` value, but you can pass your own version comparator if you want to |
-|  country (iOS only) | (optional) String  | default `undefined`, it will filter by country code while requesting an update, The value should be [ISO 3166-1 country code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2#Officially_assigned_code_elements) |
+| `curVersion` | `string` | Your current app version (semver). If omitted, it uses the native OS app version.| 
+| `toSemverConverter` | `(version: string | number) => string` | Convert the store version into semver (useful when store version uses a different format).|
+| `customVersionComparator` | `(v1: string, v2: string) => -1  0  1` | Custom comparator to decide whether an update is available (overrides built-in semver).|
+| `country` | `string` | (iOS only) ISO 3166-1 alpha-2 country code to check a specific App Store region. |
 
-and `NeedsUpdateResponse`:
+### `startUpdate(updateOptions?: StartUpdateOptions)`
 
-| Result | Type  | Description  |
+| Option | Type | Description |
 |---|---|---|
-|  shouldUpdate  | Boolean | Whether there's a newer version on the store or not  |
-|  storeVersion | String  |  The latest app/play store version we're aware of |
-|  other | Object  | Other info returned from the store (differs on Android/iOS) |
+| `updateType` | `IAUUpdateKind  IAU_UPDATE_TYPE_AUTO` | (Android only) Which Play Core mode to use. If omitted, the library chooses based on Play release priority. |
+| `allowAssetPackDeletion` | `boolean` | (Android only) Allow Play Core to delete old asset packs during update (via `AppUpdateOptions`). |
+| `title` | `string` | (iOS only) Title for the App Store prompt. |
+| `message` | `string` | (iOS only) Body message for the App Store prompt. |
+| `buttonUpgradeText` | `string` | (iOS only) Upgrade button text. |
+| `buttonCancelText` | `string` | (iOS only) Cancel button text. |
+| `country` | `string` | (iOS only) Country code for App Store lookup. |
+| `versionSpecificOptions` | `Array<IosStartUpdateOptionWithLocalVersion>` | (iOS only) Version-specific rules for prompting. |
 
-<br>
+---
 
-#### `startUpdate(updateOptions: StartUpdateOptions) : Promise`
-
-Shows pop-up asking user if they want to update, giving them the option to download said update.
-
-
-Where:
-`StartUpdateOptions `
-
-| Option                            | Type                                                                                                                          | Description                                                                                                                                                                                                                 |
-|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| updateType (Android ONLY)         | (required on Android) [IAUUpdateKind](https://github.com/SudoPlz/sp-react-native-in-app-updates/blob/master/src/types.ts#L78) | Either `IAUUpdateKind.FLEXIBLE` or `IAUUpdateKind.IMMEDIATE`. This uses play-core below the hood, read more [here](https://developer.android.com/guide/playcore/in-app-updates) about the two modes.                        |
-| title (iOS only)                  | (optional) String                                                                                                             | The title of the alert prompt when there's a new version. (default: `Update Available`)                                                                                                                                     |
-| message (iOS only)                | (optional) String                                                                                                             | The content of the alert prompt when there's a new version (default: `There is an updated version available on the App Store. Would you like to upgrade?`)                                                                  |
-| buttonUpgradeText (iOS only)      | (optional) String                                                                                                             | The text of the confirmation button on the alert prompt (default: `Upgrade `)                                                                                                                                               |
-| buttonCancelText (iOS only)       | (optional) String                                                                                                             | The text of the cancelation button on the alert prompt (default: `Cancel`)                                                                                                                                                  |
-| forceUpgrade (iOS only)           | (optional) Boolean                                                                                                            | If set to true the user won't be able to cancel the upgrade (default: `false`)                                                                                                                                              |
-| bundleId (iOS only)               | (optional) String                                                                                                             | The id that identifies the app (ex: com.apple.mobilesafari). If undefined, it will be retrieved with react-native-device-info. (default: `undefined`)                                                                       |
-| country (iOS only)                | (optional) String                                                                                                             | If set, it will filter by country code while requesting an update, The value should be [ISO 3166-1 country code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2#Officially_assigned_code_elements) (default: `undefined`) |
-| versionSpecificOptions (iOS only) | (optional) Array\<IosStartUpdateOptionWithLocalVersion>                                                                       | An array of IosStartUpdateOptionWithLocalVersion that specify rules dynamically based on what version the device is currently running. (default: `undefined`)                                                               |
-
-<br>
-
-#### `installUpdate() : void` (Android only)
-
-Installs a downloaded update.
-<br>
-
-#### `addStatusUpdateListener(callback: (status: StatusUpdateEvent) : void) : void` (Android only)
-
-Adds a listener for tracking the current status of the update download.
-
-Where: `StatusUpdateEvent`
-
-| Option | Type  | Description  |
-|---|---|---|
-|  status | [AndroidInstallStatus](https://github.com/SudoPlz/sp-react-native-in-app-updates/blob/master/src/types.ts#L1) | The status of the installation (https://developer.android.com/reference/com/google/android/play/core/install/model/InstallStatus) |
-|  bytesDownloaded | int | How many bytes were already downloaded |
-|  totalBytesToDownload | int | The total amount of bytes in the update |
-
-<br>
-
-#### `removeStatusUpdateListener(callback: (status: StatusUpdateEvent) : void): void` (Android only)
-
-Removes an existing download status listener.
-<br>
-<br>
-
-## Example:
-[Example project](https://github.com/SudoPlz/sp-react-native-in-app-updates/blob/v1/Example/App.tsx#L38)
-<br>
-<br>
-
-
+## Typical debugging workflow we had success with:
 
 ## Typical debugging workflow we had success with:
 

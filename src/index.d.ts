@@ -13,6 +13,8 @@ export {
   AndroidAvailabilityStatus as IAUAvailabilityStatus,
   AndroidInstallStatus as IAUInstallStatus,
   AndroidOther as IAUOther,
+  IAU_UPDATE_TYPE_AUTO,
+  IAUUpdatePriority,
 } from './types'; // Android only
 
 declare class SpInAppUpdates {
@@ -22,7 +24,7 @@ declare class SpInAppUpdates {
     checkOptions?: CheckOptions
   ): Promise<NeedsUpdateResponse>;
 
-  public startUpdate(updateOptions: StartUpdateOptions): Promise<void>;
+  public startUpdate(updateOptions?: StartUpdateOptions): Promise<void>;
 
   public installUpdate(): void;
 

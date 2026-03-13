@@ -13,6 +13,7 @@ import {
   AndroidAvailabilityStatus,
   AndroidUpdateType,
   AndroidNeedsUpdateResponse,
+  IAU_UPDATE_TYPE_AUTO,
 } from './types';
 import InAppUpdatesBase from './InAppUpdatesBase';
 
@@ -168,22 +169,37 @@ export default class InAppUpdates extends InAppUpdatesBase {
    * Shows pop-up asking user if they want to update, giving them the option to download said update.
    */
   public startUpdate = (
-    updateOptions: AndroidStartUpdateOptions
+    updateOptions: AndroidStartUpdateOptions = {}
   ): Promise<void> => {
-    const { updateType } = updateOptions || {};
+    const {
+      updateType = IAU_UPDATE_TYPE_AUTO,
+      allowAssetPackDeletion = false,
+    } = updateOptions || {};
+
     if (
+      updateType !== IAU_UPDATE_TYPE_AUTO &&
       updateType !== AndroidUpdateType.FLEXIBLE &&
       updateType !== AndroidUpdateType.IMMEDIATE
     ) {
       this.throwError(
-        `updateType should be one of: ${AndroidUpdateType.FLEXIBLE} or ${AndroidUpdateType.IMMEDIATE}, ${updateType} was passed.`,
+        `updateType should be one of: ${AndroidUpdateType.FLEXIBLE} or ${AndroidUpdateType.IMMEDIATE}, or ${IAU_UPDATE_TYPE_AUTO} for auto priority, ${updateType} was passed.`,
         'startUpdate'
       );
     }
-    return SpInAppUpdates.startUpdate(updateType).catch((err: any) => {
+
+    return SpInAppUpdates.startUpdate(
+      updateType,
+      allowAssetPackDeletion
+    ).catch((err: any) => {
       this.throwError(err, 'startUpdate');
     });
   };
+
+  public async getUpdatePriority(): Promise<number> {
+    const result = await this.checkNeedsUpdate();
+    const other = (result as AndroidNeedsUpdateResponse).other;
+    return other?.updatePriority ?? 0;
+  }
 
   public installUpdate = (): void => {
     SpInAppUpdates.installUpdate();
